@@ -1,0 +1,143 @@
+name: orderflow
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: orderflow_admin
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-orderflow_admin_dev}
+      ORDER_SERVICE_DB_PASSWORD: ${ORDER_SERVICE_DB_PASSWORD:-order_service_dev}
+      INVENTORY_WORKER_DB_PASSWORD: ${INVENTORY_WORKER_DB_PASSWORD:-inventory_worker_dev}
+      PAYMENT_WORKER_DB_PASSWORD: ${PAYMENT_WORKER_DB_PASSWORD:-payment_worker_dev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderflow_admin -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  kafka:
+    image: apache/kafka:4.1.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: CONTROLLER://:9093,PLAINTEXT://:29092,PLAINTEXT_HOST://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+    restart: unless-stopped
+
+  kafka-init:
+    image: apache/kafka:4.1.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "/opt/orderflow/create-topics.sh"]
+    volumes:
+      - ./docker/kafka/create-topics.sh:/opt/orderflow/create-topics.sh:ro
+    restart: "no"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.7
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: orderflow_admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-orderflow_admin_dev}
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8083:8080"
+      - "9000:9000"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./docker/keycloak/realm-orderflow.json:/opt/keycloak/data/import/realm-orderflow.json:ro
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: ../orderflow-order-service
+      dockerfile: Dockerfile
+    environment:
+      HTTP_PORT: 8080
+      DB_JDBC_URL: jdbc:postgresql://postgres:5432/orderflow_orders
+      DB_USERNAME: order_service
+      DB_PASSWORD: ${ORDER_SERVICE_DB_PASSWORD:-order_service_dev}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  inventory-worker:
+    build:
+      context: ../orderflow-inventory-worker
+      dockerfile: src/main/docker/Dockerfile.jvm
+    environment:
+      HTTP_PORT: 8080
+      DB_JDBC_URL: jdbc:postgresql://postgres:5432/orderflow_inventory
+      DB_USERNAME: inventory_worker
+      DB_PASSWORD: ${INVENTORY_WORKER_DB_PASSWORD:-inventory_worker_dev}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  payment-worker:
+    build:
+      context: ../orderflow-payment-worker
+      dockerfile: src/main/docker/Dockerfile.jvm
+    environment:
+      HTTP_PORT: 8080
+      DB_JDBC_URL: jdbc:postgresql://postgres:5432/orderflow_payments
+      DB_USERNAME: payment_worker
+      DB_PASSWORD: ${PAYMENT_WORKER_DB_PASSWORD:-payment_worker_dev}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    ports:
+      - "8082:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  kafka-data:
+  keycloak-data:

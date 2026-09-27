@@ -12,14 +12,16 @@ The system needs stable Kafka destinations without creating one topic for every 
 
 Use one command topic and one domain-event topic per worker domain:
 
-- `orderflow.inventory.commands`;
-- `orderflow.inventory.events`;
-- `orderflow.payment.commands`;
-- `orderflow.payment.events`.
+- `orderflow-inventory-commands`;
+- `orderflow-inventory-events`;
+- `orderflow-payment-commands`;
+- `orderflow-payment-events`.
+
+Topic names use hyphens exclusively as separators. This avoids Kafka metric-name collisions caused by mixing periods and underscores.
 
 Use `orderId` as the Kafka record key and as the end-to-end correlation identifier. The message envelope carries `messageType` and `schemaVersion`, allowing multiple compatible message types on a topic. Consumer groups are named for the consuming application and responsibility.
 
-Retry and DLQ topics derive from the source topic using documented suffixes and are introduced with the resilience work.
+Retry and DLQ topics derive from the source topic using documented hyphenated suffixes and are introduced with the resilience work.
 
 ## Consequences
 

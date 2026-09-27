@@ -1,0 +1,37 @@
+{
+  "realm": "orderflow",
+  "enabled": true,
+  "displayName": "OrderFlow",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "CUSTOMER",
+        "description": "Creates and reads owned orders"
+      },
+      {
+        "name": "OPERATOR",
+        "description": "Supports and reads all orders"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "orderflow-api",
+      "name": "OrderFlow API",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:*/*"
+      ],
+      "webOrigins": [
+        "http://localhost:*"
+      ],
+      "protocol": "openid-connect"
+    }
+  ]
+}
