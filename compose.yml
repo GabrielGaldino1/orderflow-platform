@@ -84,6 +84,9 @@ services:
       DB_USERNAME: order_service
       DB_PASSWORD: ${ORDER_SERVICE_DB_PASSWORD:-order_service_dev}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OIDC_ISSUER_URI: http://localhost:8083/realms/orderflow
+      OIDC_JWK_SET_URI: http://keycloak:8080/realms/orderflow/protocol/openid-connect/certs
+      OIDC_AUDIENCE: orderflow-api
     ports:
       - "8080:8080"
     depends_on:
@@ -93,6 +96,8 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
+      keycloak:
+        condition: service_started
     restart: unless-stopped
 
   inventory-worker:

@@ -33,7 +33,19 @@ Each service role has `CONNECT` only on its own database. Cross-service joins, m
 
 ## Keycloak realm import
 
-The realm is imported only during a clean Keycloak initialization. If the realm asset changes, purge the local volumes and start again. The seed contains roles and a public development client, but no production secret or real user.
+The realm is imported only during a clean Keycloak initialization. If the realm asset changes, purge the local volumes and start again. The seed contains roles, a public development client, and the disposable `customer.demo` / `orderflow_customer_dev` user. These credentials are local-only and are not production secrets.
+
+Obtain a customer token for local API calls with:
+
+```powershell
+$tokenResponse = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8083/realms/orderflow/protocol/openid-connect/token" `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body @{ grant_type = "password"; client_id = "orderflow-api"; username = "customer.demo"; password = "orderflow_customer_dev" }
+$accessToken = $tokenResponse.access_token
+```
+
+Never print or commit `$accessToken`.
 
 ## Kafka topics
 
