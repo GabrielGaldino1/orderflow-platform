@@ -82,9 +82,9 @@ foreach ($topic in $expectedTopics) {
 Write-Host 'OK: Kafka topics'
 
 $databaseChecks = @(
-    @{ Name = 'order-service migration'; User = 'order_service'; Database = 'orderflow_orders'; ExpectedCount = '2' },
-    @{ Name = 'inventory-worker migration'; User = 'inventory_worker'; Database = 'orderflow_inventory'; ExpectedCount = '1' },
-    @{ Name = 'payment-worker migration'; User = 'payment_worker'; Database = 'orderflow_payments'; ExpectedCount = '1' }
+    @{ Name = 'order-service migration'; User = 'order_service'; Database = 'orderflow_orders'; ExpectedCount = '3' },
+    @{ Name = 'inventory-worker migration'; User = 'inventory_worker'; Database = 'orderflow_inventory'; ExpectedCount = '2' },
+    @{ Name = 'payment-worker migration'; User = 'payment_worker'; Database = 'orderflow_payments'; ExpectedCount = '2' }
 )
 
 foreach ($check in $databaseChecks) {
@@ -173,9 +173,18 @@ if (($invalidHttpResponse.StatusCode -ne 422) -or ($invalidProductIds.Count -ne 
     throw 'Invalid product validation did not return HTTP 422 with every invalid product id'
 }
 
-$outboxCount = docker compose --project-name $ProjectName --project-directory $platformRoot -f (Join-Path $platformRoot 'compose.yml') exec -T postgres psql --username order_service --dbname orderflow_orders --tuples-only --no-align --command "SELECT COUNT(*) FROM outbox_messages WHERE aggregate_id = '$($createdOrder.orderId)';"
-if (($LASTEXITCODE -ne 0) -or ($outboxCount.Trim() -ne '1')) {
-    throw 'Order creation did not persist exactly one atomic outbox message'
+$outboxDeadline = (Get-Date).AddSeconds(30)
+$outboxState = ''
+do {
+    $outboxState = docker compose --project-name $ProjectName --project-directory $platformRoot -f (Join-Path $platformRoot 'compose.yml') exec -T postgres psql --username order_service --dbname orderflow_orders --tuples-only --no-align --field-separator '|' --command "SELECT COUNT(*), COUNT(published_at) FROM outbox_messages WHERE aggregate_id = '$($createdOrder.orderId)';"
+    if (($LASTEXITCODE -eq 0) -and ($outboxState.Trim() -eq '1|1')) {
+        break
+    }
+    Start-Sleep -Milliseconds 500
+} while ((Get-Date) -lt $outboxDeadline)
+
+if ([string]::IsNullOrWhiteSpace($outboxState) -or ($outboxState.Trim() -ne '1|1')) {
+    throw 'Order creation did not persist and publish exactly one atomic outbox message'
 }
 
-Write-Host 'OK: authenticated idempotent order creation, validation and transactional outbox'
+Write-Host 'OK: authenticated idempotent order creation, validation and transactional outbox publication'

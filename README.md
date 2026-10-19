@@ -96,3 +96,5 @@ Exercise a clean bootstrap, including database and realm initialization:
 Removing volumes deletes all local OrderFlow data. It does not modify source repositories.
 
 See [local troubleshooting](docs/local-development.md) for diagnostics and recovery.
+See the [transactional outbox runbook](docs/outbox-runbook.md) for backlog metrics, retry behavior,
+and Kafka/database incident recovery.
