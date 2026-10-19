@@ -11,6 +11,7 @@ docker compose logs --tail 100 postgres kafka keycloak order-service inventory-w
 ```
 
 Application logs must not print database passwords, bearer tokens, authorization headers, or payment tokens.
+Outbox logs contain message identifiers and bounded technical metadata only; they must never contain payloads.
 
 ## Java mismatch
 
@@ -58,3 +59,5 @@ docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server loca
 ## Recovery
 
 Start with a normal restart so data is retained. Purge volumes only when validating a clean bootstrap or recovering disposable local state. If a build fails before Compose starts, run the Maven Wrapper directly in the failing repository to obtain its complete error output.
+
+For publisher backlog diagnosis and recovery, follow the [transactional outbox runbook](outbox-runbook.md).

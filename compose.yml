@@ -84,6 +84,10 @@ services:
       DB_USERNAME: order_service
       DB_PASSWORD: ${ORDER_SERVICE_DB_PASSWORD:-order_service_dev}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OUTBOX_BATCH_SIZE: 50
+      OUTBOX_POLL_INTERVAL: 500ms
+      OUTBOX_CLAIM_TIMEOUT: 30s
+      OUTBOX_SEND_TIMEOUT: 10s
       OIDC_ISSUER_URI: http://localhost:8083/realms/orderflow
       OIDC_JWK_SET_URI: http://keycloak:8080/realms/orderflow/protocol/openid-connect/certs
       OIDC_AUDIENCE: orderflow-api
@@ -110,6 +114,10 @@ services:
       DB_USERNAME: inventory_worker
       DB_PASSWORD: ${INVENTORY_WORKER_DB_PASSWORD:-inventory_worker_dev}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OUTBOX_BATCH_SIZE: 50
+      OUTBOX_POLL_INTERVAL: 1s
+      OUTBOX_CLAIM_TIMEOUT: 30s
+      OUTBOX_SEND_TIMEOUT: 10s
     ports:
       - "8081:8080"
     depends_on:
@@ -131,6 +139,10 @@ services:
       DB_USERNAME: payment_worker
       DB_PASSWORD: ${PAYMENT_WORKER_DB_PASSWORD:-payment_worker_dev}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OUTBOX_BATCH_SIZE: 50
+      OUTBOX_POLL_INTERVAL: 1s
+      OUTBOX_CLAIM_TIMEOUT: 30s
+      OUTBOX_SEND_TIMEOUT: 10s
     ports:
       - "8082:8080"
     depends_on:
